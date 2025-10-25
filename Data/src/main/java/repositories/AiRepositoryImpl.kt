@@ -46,11 +46,18 @@ class AiRepositoryImpl @Inject constructor() : AiRepository {
         return withContext(Dispatchers.IO) {
             try {
                 val interviewJson = gson.toJson(interviewInfo)
+//                val prompt = "Вот данные о собеседовании в формате JSON: $interviewJson. " +
+//                        "Проанализируй эту информацию. В ответе дай ТОЛЬКО ЧИСЛО - количество баллов от 0 до 100 которое по твоему мнению набрал пользователь. " +
+//                        "кандидат подходит если он в возрасте от 18 до 24 и если он нигде не работает, вопрос кем он видит себя через 5 лет не играет роли. " +
+//                        "ВАЖНО: Твой ответ должен быть ТОЛЬКО ОДНИМ ЧИСЛОМ (например, '85'). НИКАКИХ ОБЪЯСНЕНИЙ, ТЕКСТА, ПУНКТОВ ИЛИ СЛОВ! Если ответ не число — это ошибка. ПОВТОРЯЮ: ТОЛЬКО ЧИСЛО!"
+
                 val prompt = "Вот данные о собеседовании в формате JSON: $interviewJson. " +
                         "Проанализируй эту информацию. В ответе дай ТОЛЬКО ЧИСЛО - количество баллов от 0 до 100 которое по твоему мнению набрал пользователь. " +
                         "кандидат подходит если он в возрасте от 18 до 24 и если он нигде не работает, вопрос кем он видит себя через 5 лет не играет роли" +
-                        "Повторю, в ответе укажи ТОЛЬКО КОЛИЧЕСТВО БАЛЛОВ которые набрал пользователь одним числом."
+                        "Повторю, в ответе укажи ТОЛЬКО КОЛИЧЕСТВО БАЛЛОВ которые набрал пользователь одним числом. Твой ответ должен представлять из себя ТОЛЬКО ЧИСЛО! БЕЗ ТЕКСТА!!!"
 
+
+                //val prompt = "где обитают львы?"
 
                 val request = AiRequest(
                     // ↓ Указываем конкретную модель OpenRouter [citation:1]
@@ -61,8 +68,10 @@ class AiRepositoryImpl @Inject constructor() : AiRepository {
                             content = prompt
                         )
                     ),
-                    temperature = 0.5f,
-                    maxTokens = 2000,
+                    //temperature = 0.5f,
+                    temperature = 0f,
+                    //maxTokens = 2000,
+                    maxTokens = 5,
                     stream = false
                 )
 
@@ -75,7 +84,16 @@ class AiRepositoryImpl @Inject constructor() : AiRepository {
 
                 val response = api.sendInterviewData(authHeader, request)
                 // Обработка ответа остается прежней
-                response.choices.firstOrNull()?.message?.content ?: "no answer"
+                val responseText = response.choices.firstOrNull()?.message?.content ?: "no answer"
+
+                //test:
+                Log.d("apilog", responseText)
+
+//                val score = responseText.trim().substringAfterLast(" ").toIntOrNull() ?: 0
+//                score.toString()
+                val score = responseText.lines().lastOrNull()
+                score.toString()
+
             } catch (e: Exception) {
                 Log.e("AiRepositoryImpl", "Error sending data: ${e.message}", e)
                 "error occurred: ${e.message}"

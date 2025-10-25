@@ -59,10 +59,14 @@ class InterviewScreenViewModel @Inject constructor(
 
     @RequiresApi(Build.VERSION_CODES.Q)
     fun stopInterview(){
-        _uiState.update { it.copy(isInterviewFinished = true) }
-        stopVideoPreview()
-        stopRecording()
-        extractTextFromInterview(recordedVideo)
+        viewModelScope.launch {
+            _uiState.update { it.copy(isInterviewFinished = true) }
+            stopVideoPreview()
+//            stopRecording()
+//            extractTextFromInterview(recordedVideo)
+//
+            sendInterviewToAi(uiState.value.interviewInfo)
+        }
     }
 
 
@@ -88,6 +92,8 @@ class InterviewScreenViewModel @Inject constructor(
             // Завершить интервью
             _uiState.value = _uiState.value.copy(isInterviewFinished = true)
             _uiState.value = _uiState.value.copy(isInterviewStarted = false)
+
+
         }
 
     }
@@ -105,18 +111,14 @@ class InterviewScreenViewModel @Inject constructor(
         recordVideoUseCase.startCameraRecording(context)
     }
     @RequiresApi(Build.VERSION_CODES.Q)
-    fun stopRecording(){
-        viewModelScope.launch {
-            Log.d("InterviewScreenViewModel", "0")
-            _uiState.value = _uiState.value.copy(isRecording = false)
-            Log.d("InterviewScreenViewModel", "1")
-            val video = recordVideoUseCase.stopCameraRecording()
-            Log.d("InterviewScreenViewModel", "2")
+    suspend fun stopRecording(){
+        Log.d("InterviewScreenViewModel", "0")
+        _uiState.value = _uiState.value.copy(isRecording = false)
+        Log.d("InterviewScreenViewModel", "1")
+        val video = recordVideoUseCase.stopCameraRecording()
+        Log.d("InterviewScreenViewModel", "2")
 
-            recordedVideo = video!!
-        }
-
-
+        recordedVideo = video!!
     }
 
     fun stopVideoPreview() {
@@ -127,7 +129,15 @@ class InterviewScreenViewModel @Inject constructor(
     fun sendInterviewToAi(interviewInfo: InterviewInfo){
         viewModelScope.launch {
             val answer = analyzeInterviewUseCase.analyze(interviewInfo)
-            Log.d("ответ: ", answer.toString())
+            Log.d("apilog", answer.toString())
+            try {
+                val score = answer.toInt()
+                _uiState.update { it.copy(testFinalScore = score) }
+
+            }
+            catch (e: Exception){
+
+            }
         }
     }
 
@@ -139,3 +149,4 @@ class InterviewScreenViewModel @Inject constructor(
         return textFromVideoFile
     }
 }
+
