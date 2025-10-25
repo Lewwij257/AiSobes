@@ -4,50 +4,78 @@ import android.util.Log
 import com.google.gson.Gson
 import datamodel.AiModelMessage
 import datamodel.AiRequest
-import datamodel.AiResponse
 import entities.InterviewInfo
 import interfaces.AiRepository
-import interfaces.YandexGPTApi
+import interfaces.OpenRouterApi // ← Изменил импорт
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Inject
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 
 class AiRepositoryImpl @Inject constructor() : AiRepository {
 
     private val retrofit: Retrofit by lazy {
+        val logging = HttpLoggingInterceptor { message ->
+            Log.d("ApiLog", message)
+        }
+        logging.level = HttpLoggingInterceptor.Level.BODY
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .build()
+
+        // ↓ Базовый URL изменен на OpenRouter
         Retrofit.Builder()
-            .baseUrl("https://llm.api.cloud.yandex.net/")
+            .baseUrl("https://openrouter.ai/api/v1/")
+            .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
     private val gson = Gson()
 
-    private val apiKey = "Api-Key AQVNwwUC2b_1S4ijqq66qP0GfHNU-4IAaOGAqHwc" // инжектить или BuildConfig.YANDEX_API_KEY
+    // ↓ Замени на свой API-ключ с OpenRouter (бесплатный на openrouter.ai/settings/keys)
+    private val apiKey = "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"
 
-    private val api: YandexGPTApi by lazy { retrofit.create(YandexGPTApi::class.java) }
+    private val api: OpenRouterApi by lazy { retrofit.create(OpenRouterApi::class.java) } // ← Новый интерфейс
 
     override suspend fun sendInterviewDataToAi(interviewInfo: InterviewInfo): String {
         return withContext(Dispatchers.IO) {
             try {
                 val interviewJson = gson.toJson(interviewInfo)
-                val prompt = "Вот данные о собеседовании в формате JSON: $interviewJson. Проанализируй эту информацию, выдели ключевые моменты, сильные и слабые стороны, и дай рекомендации по улучшению для следующих собеседований."
+                val prompt = "Вот данные о собеседовании в формате JSON: $interviewJson. " +
+                        "Проанализируй эту информацию. В ответе дай ТОЛЬКО ЧИСЛО - количество баллов от 0 до 100 которое по твоему мнению набрал пользователь. " +
+                        "кандидат подходит если он в возрасте от 18 до 24 и если он нигде не работает, вопрос кем он видит себя через 5 лет не играет роли" +
+                        "Повторю, в ответе укажи ТОЛЬКО КОЛИЧЕСТВО БАЛЛОВ которые набрал пользователь одним числом."
+
 
                 val request = AiRequest(
-                    modelUri = "gpt://aje30k1djfvl9e4a7ale/yandexgpt/latest",
+                    // ↓ Указываем конкретную модель OpenRouter [citation:1]
+                    model = "tngtech/deepseek-r1t-chimera:free",
                     messages = listOf(
                         AiModelMessage(
-                            "user",
-                            prompt
+                            role = "user",
+                            content = prompt
                         )
-                    )
+                    ),
+                    temperature = 0.5f,
+                    maxTokens = 2000,
+                    stream = false
                 )
 
-                val response = api.sendInterviewData(apiKey, request)
+                Log.d("ApiLog", "Запрос JSON: ${gson.toJson(request)}")
 
-                response.result?.firstOrNull()?.message?.message ?: "no answer"
+                // ↓ Формат авторизации для OpenRouter [citation:10]
+                val authHeader = "Bearer $apiKey"
+
+                Log.d("ApiLog", "Auth: $authHeader")
+
+                val response = api.sendInterviewData(authHeader, request)
+                // Обработка ответа остается прежней
+                response.choices.firstOrNull()?.message?.content ?: "no answer"
             } catch (e: Exception) {
                 Log.e("AiRepositoryImpl", "Error sending data: ${e.message}", e)
                 "error occurred: ${e.message}"

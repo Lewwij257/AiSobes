@@ -10,5 +10,7 @@ data class InterviewScreenUiState (
     val isInterviewStarted: Boolean = false,
     val isInterviewFinished: Boolean = false,
 
-    val isRecording: Boolean = false
+    val isRecording: Boolean = false,
+
+    val testFinalScore: Int = -1
 )

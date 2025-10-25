@@ -149,9 +149,15 @@ fun InterviewScreen(viewModel: InterviewScreenViewModel){
 
         if(uiState.isInterviewStarted){
             Card {
-                Text(
-                    text = currentQuestion?: ""
-                )
+                if (uiState.isInterviewFinished){
+                    Text("")
+                }
+                else{
+                    Text(
+                        text = currentQuestion?: ""
+                    )
+                }
+
             }
         }
         else if (uiState.isInterviewFinished){
@@ -180,9 +186,6 @@ fun InterviewScreen(viewModel: InterviewScreenViewModel){
             Button(
                 onClick = {
                     viewModel.startInterview(lifecycleOwner, previewView?: return@Button)
-
-                    //test
-                    viewModel.startRecording()
                 }
             ) {
                 Text(text = "Начать интервью")
@@ -192,19 +195,23 @@ fun InterviewScreen(viewModel: InterviewScreenViewModel){
         else if (!uiState.isInterviewFinished && uiState.isInterviewStarted){
             TextButton(
                 onClick = {
-                    if (uiState.currentQuestionIndex == uiState.interviewInfo.questions.count()-1){
-                        viewModel.stopVideoPreview()
-                        viewModel.stopRecording()
+                    if (uiState.currentQuestionIndex+1==uiState.interviewInfo.questions.count()){
+                        //последний вопрос
+                        viewModel.stopInterview()
                     }
                     else{
                         viewModel.nextQuestion()
-                    }},
+                    }
+                },
                 modifier = Modifier,
             ) {
 
-                if(uiState.currentQuestionIndex == uiState.interviewInfo.questions.count()-1){
+                if(uiState.isInterviewFinished){
                     Text("Интервью окончено!")
-                    viewModel.sendInterviewToAi(uiState.interviewInfo)
+                    //viewModel.sendInterviewToAi(uiState.interviewInfo)
+                }
+                else if(uiState.currentQuestionIndex+1 == uiState.interviewInfo.questions.count()){
+                    Text("Закончить интервью!")
                 }
                 else{
                     Text(text = "Следующий вопрос!")
@@ -213,8 +220,15 @@ fun InterviewScreen(viewModel: InterviewScreenViewModel){
         }
 
         else{
-
-
+                Text(
+                    text = "На этом всё!"
+                )
+                if (uiState.testFinalScore == -1){
+                    Text("Пожалуйста, не закрывайте приложение\nРезультаты загружаются...", textAlign = TextAlign.Center)
+                }
+                else{
+                    Text("Ваш итоговый балл: ${uiState.testFinalScore}", textAlign = TextAlign.Center)
+            }
         }
     }
 

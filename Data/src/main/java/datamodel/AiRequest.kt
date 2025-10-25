@@ -1,36 +1,32 @@
 package datamodel
 
-import android.health.connect.datatypes.units.Temperature
-import android.net.Uri
-
-
 data class AiRequest(
-    val modelUri: String = "gpt://aje30k1djfvl9e4a7ale/yandexgpt-lite",
-
-    val stream: Boolean = false,
-    val temperature: Float = 0.5f, //0-1 вариативность ответа
+    // ↓ Модель теперь обязательный параметр [citation:10]
+    val model: String,
+    val messages: List<AiModelMessage> = emptyList(),
+    val temperature: Float = 0.5f,
     val maxTokens: Int = 2000,
+    val stream: Boolean = false
+)
 
-    val messages: List<AiModelMessage> = emptyList()
 
+
+// Остальные data class остаются без изменений
+data class AiModelMessage(
+    val role: String,
+    val content: String
 )
 
 data class AiResponse(
-    val result: List<Generation>? = emptyList()
+    val choices: List<Choice> = emptyList(),
+    val error: ErrorDetail? = null // Добавьте на случай ошибок
 )
 
-data class AiModelMessage(
-    val role: String, //system, user, assistant
-    val message: String
+data class ErrorDetail(
+    val message: String,
+    val code: Int
 )
 
-data class Generation(
-    val message: AiModelMessage,
-    val alternatives: List<Alternative> = emptyList()
-)
-
-data class Alternative(
-    val message: AiModelMessage,
-    val logprobs: Any? = null,
-    val finalReason: String? = null
+data class Choice(
+    val message: AiModelMessage
 )

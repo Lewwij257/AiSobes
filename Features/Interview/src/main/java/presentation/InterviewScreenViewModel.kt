@@ -20,6 +20,7 @@ import usecases.ExtractAudioUseCase
 import usecases.RecordVideoUseCase
 import usecases.StartInterviewUseCase
 import usecases.TranscribeAudioUseCase
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -32,6 +33,8 @@ class InterviewScreenViewModel @Inject constructor(
 
     val _uiState = MutableStateFlow(InterviewScreenUiState())
     val uiState: StateFlow<InterviewScreenUiState> = _uiState.asStateFlow()
+
+    private lateinit var recordedVideo: File
 
 
     private lateinit var context: Context //да неправильно но камера того требует
@@ -51,11 +54,33 @@ class InterviewScreenViewModel @Inject constructor(
 
     fun startInterview(lifecycleOwner: LifecycleOwner, previewView: PreviewView){
         _uiState.update { it.copy(isInterviewStarted = true, isInterviewFinished = false, isRecording = true) }
-        //startVideoPreview(lifecycleOwner, previewView)
+        startRecording()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    fun stopInterview(){
+        _uiState.update { it.copy(isInterviewFinished = true) }
+        stopVideoPreview()
+        stopRecording()
+        extractTextFromInterview(recordedVideo)
     }
 
 
-    fun nextQuestion() {
+    @RequiresApi(Build.VERSION_CODES.Q)
+    fun nextQuestion(){
+        viewModelScope.launch {
+            turnNextQuestion()
+        }
+    }
+    @RequiresApi(Build.VERSION_CODES.Q)
+    suspend fun turnNextQuestion() {
+
+        stopRecording()
+
+        val userAnswerToQuestion = extractTextFromInterview(recordedVideo)
+        _uiState.update { it.copy(interviewInfo = _uiState.value.interviewInfo.copy(userResponses = uiState.value.interviewInfo.userResponses + userAnswerToQuestion)) }
+        startRecording()
+
         val currentIndex = _uiState.value.currentQuestionIndex
         if (currentIndex < _uiState.value.interviewInfo.questions.size - 1) {
             _uiState.value = _uiState.value.copy(currentQuestionIndex = currentIndex + 1)
@@ -81,28 +106,16 @@ class InterviewScreenViewModel @Inject constructor(
     }
     @RequiresApi(Build.VERSION_CODES.Q)
     fun stopRecording(){
-
         viewModelScope.launch {
-
             Log.d("InterviewScreenViewModel", "0")
             _uiState.value = _uiState.value.copy(isRecording = false)
             Log.d("InterviewScreenViewModel", "1")
-            val recordedVideo = recordVideoUseCase.stopCameraRecording()
+            val video = recordVideoUseCase.stopCameraRecording()
             Log.d("InterviewScreenViewModel", "2")
-            if (recordedVideo!=null){
-                viewModelScope.launch {
-                    Log.d("InterviewScreenViewModel", "3")
-                    val audioFile = extractAudioUseCase.extractAudio(context, recordedVideo)?: return@launch
-                    val textFromVideoFile = transcribeAudioUseCase.transcribeAudio(context, audioFile)
-                    Log.d("InterviewScreenViewModel", textFromVideoFile.toString())
-                }
 
-            }
-            else{
-                Log.d("InterviewScreenViewModel", "interview is null")
-
-            }
+            recordedVideo = video!!
         }
+
 
     }
 
@@ -116,5 +129,13 @@ class InterviewScreenViewModel @Inject constructor(
             val answer = analyzeInterviewUseCase.analyze(interviewInfo)
             Log.d("ответ: ", answer.toString())
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    fun extractTextFromInterview(video: File): String{
+        val audioFile = extractAudioUseCase.extractAudio(context, video)
+        val textFromVideoFile = transcribeAudioUseCase.transcribeAudio(context, audioFile!!)
+        Log.d("InterviewScreenViewModel", textFromVideoFile)
+        return textFromVideoFile
     }
 }
